@@ -104,32 +104,48 @@ function updateAcceptorsForSSL() {
 
   if sslEnabled ; then
     
-    echo "keystore filepath: $keyStorePath"
+    echo "=xxx===keystore filepath: $keyStorePath"
 
     IFS=',' read -a protocols <<< $(find_env "AMQ_TRANSPORTS" "openwire,amqp,stomp,mqtt,hornetq")
+
     connectionsAllowed=$(find_env "AMQ_MAX_CONNECTIONS" "1000")
+
+    sslProvider=$(find_env "AMQ_SSL_PROVIDER" "")
+
+    echo "====testing if sslProvider is empty"
+    echo "====got: ${sslProvider}"
+    if [ -z "${sslProvider}" ] ; then
+       SSL_OPS="sslEnabled=true;keyStorePath=${keyStorePath};keyStorePassword=${keyStorePassword}"
+    else
+       echo "=====ssl Provider is not empty: ${sslProvider}"
+       SSL_OPS="sslEnabled=true;keyStorePath=${keyStorePath};keyStorePassword=${keyStorePassword};sslProvider=${sslProvider}"
+    fi
+    echo "=== sslops: $SSL_OPS"
 
     if [ "${#protocols[@]}" -ne "0" ]; then
       acceptors=""
       for protocol in ${protocols[@]}; do
         case "${protocol}" in
         "openwire")
-        acceptors="${acceptors}            <acceptor name=\"artemis-ssl\">tcp://${ACCEPTOR_IP}:61617?tcpSendBufferSize=1048576;tcpReceiveBufferSize=1048576;protocols=CORE,AMQP,STOMP,HORNETQ,MQTT,OPENWIRE;useEpoll=true;amqpCredits=1000;amqpLowCredits=300;connectionsAllowed=${connectionsAllowed};sslEnabled=true;keyStorePath=${keyStorePath};keyStorePassword=${keyStorePassword}</acceptor>\n"
+        acceptors="${acceptors}            <acceptor name=\"artemis-ssl\">tcp://${ACCEPTOR_IP}:61617?tcpSendBufferSize=1048576;tcpReceiveBufferSize=1048576;protocols=CORE,AMQP,STOMP,HORNETQ,MQTT,OPENWIRE;useEpoll=true;amqpCredits=1000;amqpLowCredits=300;connectionsAllowed=${connectionsAllowed};${SSL_OPS}</acceptor>\n"
         ;;
       "mqtt")
-      acceptors="${acceptors}            <acceptor name=\"mqtt-ssl\">tcp://${ACCEPTOR_IP}:8883?tcpSendBufferSize=1048576;tcpReceiveBufferSize=1048576;protocols=MQTT;useEpoll=true;connectionsAllowed=${connectionsAllowed};sslEnabled=true;keyStorePath=${keyStorePath};keyStorePassword=${keyStorePassword}</acceptor>\n"
+      acceptors="${acceptors}            <acceptor name=\"mqtt-ssl\">tcp://${ACCEPTOR_IP}:8883?tcpSendBufferSize=1048576;tcpReceiveBufferSize=1048576;protocols=MQTT;useEpoll=true;connectionsAllowed=${connectionsAllowed};${SSL_OPS}</acceptor>\n"
       ;;
     "amqp")
-    acceptors="${acceptors}            <acceptor name=\"amqp-ssl\">tcp://${ACCEPTOR_IP}:5671?tcpSendBufferSize=1048576;tcpReceiveBufferSize=1048576;protocols=AMQP;useEpoll=true;amqpCredits=1000;amqpMinCredits=300;connectionsAllowed=${connectionsAllowed};sslEnabled=true;keyStorePath=${keyStorePath};keyStorePassword=${keyStorePassword}</acceptor>\n"
+    acceptors="${acceptors}            <acceptor name=\"amqp-ssl\">tcp://${ACCEPTOR_IP}:5671?tcpSendBufferSize=1048576;tcpReceiveBufferSize=1048576;protocols=AMQP;useEpoll=true;amqpCredits=1000;amqpMinCredits=300;connectionsAllowed=${connectionsAllowed};${SSL_OPS}</acceptor>\n"
     ;;
   "stomp")
-  acceptors="${acceptors}            <acceptor name=\"stomp-ssl\">tcp://${ACCEPTOR_IP}:61612?tcpSendBufferSize=1048576;tcpReceiveBufferSize=1048576;protocols=STOMP;useEpoll=true;connectionsAllowed=${connectionsAllowed};sslEnabled=true;keyStorePath=${keyStorePath};keyStorePassword=${keyStorePassword}</acceptor>\n"
+  acceptors="${acceptors}            <acceptor name=\"stomp-ssl\">tcp://${ACCEPTOR_IP}:61612?tcpSendBufferSize=1048576;tcpReceiveBufferSize=1048576;protocols=STOMP;useEpoll=true;connectionsAllowed=${connectionsAllowed};${SSL_OPS}</acceptor>\n"
   ;;
 esac
       done
     fi
     safeAcceptors=$(echo "${acceptors}" | sed 's/\//\\\//g')	    	
     sed -i "/<\/acceptors>/ s/.*/${safeAcceptors}\n&/" ${instanceDir}/etc/broker.xml    
+    #debug
+    echo "===dump broker.xml==="
+    cat ${instanceDir}/etc/broker.xml
   fi
 }
 
